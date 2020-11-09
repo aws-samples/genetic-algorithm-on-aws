@@ -1,0 +1,191 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy of
+# this software and associated documentation files (the "Software"), to deal in
+# the Software without restriction, including without limitation the rights to
+# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+# the Software, and to permit persons to whom the Software is furnished to do so.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+# FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+# COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  AWS CloudFormation Template to create AWS Batch, ECR and other needed resources.
+  **WARNING** You will be billed for the AWS resources used if you create a stack from this template.
+
+Resources:
+
+  VPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: 10.0.0.0/16
+
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+
+  RouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+
+  VPCGatewayAttachment:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  SecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: EC2 Security Group for instances launched in the VPC by Batch
+      VpcId: !Ref VPC
+
+  Subnet:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      CidrBlock: 10.0.0.0/24
+      VpcId: !Ref VPC
+      MapPublicIpOnLaunch: 'True'
+
+  Route:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref Subnet
+
+  BatchServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: batch.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole'
+
+  IamInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Roles:
+        - !Ref EcsInstanceRole
+
+  # this role is used to run the container, so give it all the permissions you need
+  EcsInstanceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2008-10-17
+        Statement:
+          - Sid: ''
+            Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+
+  JobDefinition:
+    Type: 'AWS::Batch::JobDefinition'
+    Properties:
+      Type: container
+      ContainerProperties:
+        Image: !Join
+          - ''
+          - - !Ref 'AWS::AccountId'
+            - .dkr.ecr.
+            - !Ref 'AWS::Region'
+            - '.amazonaws.com/'
+            - !Ref ContainerRegistryRepo
+        Vcpus: 64
+        Memory: 64000
+        Command:
+          - python
+          - genetic_algorithm.py
+        Environment:
+          - Name: "AWS_DEFAULT_REGION"
+            Value: "us-east-2"
+      RetryStrategy:
+        Attempts: 1
+
+  JobQueue:
+    Type: 'AWS::Batch::JobQueue'
+    Properties:
+      Priority: 1
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref ComputeEnvironment
+
+  ComputeEnvironment:
+    Type: 'AWS::Batch::ComputeEnvironment'
+    Properties:
+      Type: MANAGED
+      ComputeResources:
+        Type: EC2
+        MinvCpus: 0
+        DesiredvCpus: 64
+        MaxvCpus: 384
+        InstanceTypes:
+          - optimal
+        Subnets:
+          - !Ref Subnet
+        SecurityGroupIds:
+          - !Ref SecurityGroup
+        InstanceRole: !Ref IamInstanceProfile
+      ServiceRole: !Ref BatchServiceRole
+
+  ContainerRegistryRepo:
+    Type: 'AWS::ECR::Repository'
+
+  ResultsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${AWS::StackName}-Results"
+      AttributeDefinitions:
+        - AttributeName: GUID
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: GUID
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  DeliveryStopsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${AWS::StackName}-DeliveryStops"
+      AttributeDefinitions:
+        - AttributeName: StopsSetID
+          AttributeType: "N"
+      KeySchema:
+        - AttributeName: StopsSetID
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+Outputs:
+  ComputeEnvironmentArn:
+    Value: !Ref ComputeEnvironment
+  JobQueueArn:
+    Value: !Ref JobQueue
+  JobDefinitionArn:
+    Value: !Ref JobDefinition
+  ECRContainerName:
+    Value: !Ref ContainerRegistryRepo
+  ResultTableName:
+    Value: !Ref ResultsTable
+  DeliveryStopsTableName:
+    Value: !Ref DeliveryStopsTable
