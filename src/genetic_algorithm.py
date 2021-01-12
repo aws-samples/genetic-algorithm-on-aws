@@ -312,9 +312,10 @@ def find_best_path():
 
         # print per-generation stats
         gen_num_str = '{:>4}'.format(generation_number)
-        low_score_str = str(best_distance_all_time)
+        low_score_str = '{:>6}'.format(str(best_distance_all_time))
         duration = '{:4.1f}'.format(time.time() - generation_start_time)
-        print(f'Gen {gen_num_str} \tbest: {low_score_str} \tuniq: {num_uniq_fitness_scores} \tdur: {duration}s ')
+        uniq_str = '{:>4}'.format(num_uniq_fitness_scores)
+        print(f'Gen {gen_num_str}   best: {low_score_str}   uniq: {uniq_str}   dur: {duration}s ')
 
         # now that the next generation is ready, replace the current generation with it
         current_generation = next_generation
@@ -342,6 +343,7 @@ if __name__ == "__main__":
     MUTATION_RATE = float(args.get("mutation"))
     TOURNEY_SIZE = int(args.get("tourney"))
 
+    print('')
     print(f'Crossover: {CROSSOVER_RATE}  Elitism: {ELITISM_RATE} Mutation: {MUTATION_RATE} Tourney: {TOURNEY_SIZE}')
 
     delivery_stop_locations = load_delivery_stops()

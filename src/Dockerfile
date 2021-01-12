@@ -1,9 +1,8 @@
-FROM python:3.7-alpine
+FROM python:3
 
-COPY . /app
+RUN pip install boto3
 
-WORKDIR /app
+ENV PYTHONUNBUFFERED=TRUE
+ENV AWS_DEFAULT_REGION=us-east-2
 
-RUN pip install -r requirements.txt
-
-ENTRYPOINT ["/usr/bin/env"]
+ENTRYPOINT ["python3"]
