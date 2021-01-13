@@ -43,7 +43,7 @@ Resources:
   ResultsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "${AWS::StackName}-Results"
+      TableName: "ga-blog-stack-Results"
       AttributeDefinitions:
         - AttributeName: GUID
           AttributeType: "S"
@@ -55,7 +55,7 @@ Resources:
   DeliveryStopsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "${AWS::StackName}-DeliveryStops"
+      TableName: "ga-blog-stack-DeliveryStops"
       AttributeDefinitions:
         - AttributeName: StopsSetID
           AttributeType: "N"
