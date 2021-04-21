@@ -249,7 +249,7 @@ def find_best_path():
     per_generation_best_scores = []
 
     # the multiprocessing code doesn't work on Windows
-    use_multiprocessing = "win" not in sys.platform
+    use_multiprocessing = "win" not in sys.platform or sys.platform == "darwin"
     pool = multiprocessing.Pool()
 
     job_start_time = time.time()
