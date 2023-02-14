@@ -15,7 +15,12 @@
 
 AWSTemplateFormatVersion: 2010-09-09
 Description: >-
-  AWS CloudFormation Template to create IAM role and DDB tables
+  (PACE000015/v1/backend) AWS CloudFormation Template to create IAM role and DDB tables
+
+Metadata:
+    ID: PACE000015
+    Version: 1
+    Stack: backend
 
 Resources:
 
